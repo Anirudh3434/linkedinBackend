@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -6,12 +7,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const CLIENT_ID = '86pg9onlum0hah';
-const CLIENT_SECRET = 'WPL_AP1.9BuYogv2pcEsswsG.PdCw5Q==';
-const REDIRECT_URI = 'https://linkedinbackend-1.onrender.com/linkedin/callback';
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const REDIRECT_URI = process.env.REDIRECT_URI;
 
 app.get('/linkedin/callback', async (req, res) => {
-  console.log("🔹 Callback URL hit");  // Debugging
+  console.log("🔹 Callback URL hit");
 
   const { code, state, error, error_description } = req.query;
 
@@ -42,9 +43,10 @@ app.get('/linkedin/callback', async (req, res) => {
     console.log("✅ Token Response:", tokenResponse.data);
     res.json(tokenResponse.data);
   } catch (tokenError) {
-    console.error("❌ Error exchanging token:", tokenError.response.data);
+    console.error("❌ Error exchanging token:", tokenError?.response?.data || tokenError.message);
     res.status(500).json({ error: 'Failed to get access token' });
   }
 });
 
-app.listen(8080, () => console.log('🚀 Server running on port 8080'));
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
