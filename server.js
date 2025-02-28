@@ -8,7 +8,7 @@ app.use(express.json());
 
 const CLIENT_ID = '86pg9onlum0hah';
 const CLIENT_SECRET = 'WPL_AP1.9BuYogv2pcEsswsG.PdCw5Q=='; // Keep this secure
-const REDIRECT_URI = 'http://192.168.1.103:8080/linkedin/callback';
+const REDIRECT_URI = 'https://linkedinbackend-1.onrender.com/linkedin/callback';
 
 // 🔹 Route to handle LinkedIn callback  
 app.get('/linkedin/callback', async (req, res) => {
