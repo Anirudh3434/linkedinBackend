@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');  // ✅ For decoding ID token
 
 const app = express();
 app.use(cors());
@@ -14,21 +15,22 @@ const REDIRECT_URI = process.env.REDIRECT_URI;
 app.get('/linkedin/callback', async (req, res) => {
   console.log("🔹 Callback URL hit");
 
-  const { code, state, error, error_description } = req.query;
+  const { code, error, error_description } = req.query;
 
   if (error) {
-    console.error("LinkedIn Error:", error, error_description);
+    console.error("❌ LinkedIn Error:", error, error_description);
     return res.status(400).json({ error, error_description });
   }
 
   if (!code) {
-    console.error("❌ Authorization code is missing");
+    console.error("❌ Authorization code missing");
     return res.status(400).json({ error: "Authorization code missing" });
   }
 
   console.log("✅ Authorization Code Received:", code);
 
   try {
+    // ✅ Exchange Authorization Code for Access Token
     const tokenResponse = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', null, {
       params: {
         grant_type: 'authorization_code',
@@ -40,10 +42,34 @@ app.get('/linkedin/callback', async (req, res) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
 
+    const { id_token, access_token } = tokenResponse.data;
     console.log("✅ Token Response:", tokenResponse.data);
-    res.json(tokenResponse.data);
-  } catch (tokenError) {
-    console.error("❌ Error exchanging token:", tokenError?.response?.data || tokenError.message);
+
+    // ✅ Decode ID Token (JWT) to extract user info
+    const decodedToken = jwt.decode(id_token);
+
+    if (decodedToken) {
+      console.log("🔹 User Info:", decodedToken);
+
+      const userData = {
+        email: decodedToken.email,
+        firstName: decodedToken.given_name,
+        lastName: decodedToken.family_name,
+        picture: decodedToken.picture,
+      };
+
+      res.json({
+        message: "User info retrieved successfully",
+        user: userData,
+        access_token,
+      });
+
+    } else {
+      res.status(400).json({ error: "Failed to decode ID token" });
+    }
+
+  } catch (error) {
+    console.error("❌ Error exchanging token:", error?.response?.data || error.message);
     res.status(500).json({ error: 'Failed to get access token' });
   }
 });
