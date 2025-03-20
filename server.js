@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
-const jwt = require('jsonwebtoken');  // ✅ For decoding ID token
 
 const app = express();
 app.use(cors());
@@ -42,35 +41,39 @@ app.get('/linkedin/callback', async (req, res) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
 
-    const { id_token, access_token } = tokenResponse.data;
-    console.log("✅ Token Response:", tokenResponse.data);
+    const { access_token } = tokenResponse.data;
+    console.log("✅ Access Token:", access_token);
 
-    // ✅ Decode ID Token (JWT) to extract user info
-    const decodedToken = jwt.decode(id_token);
+    // ✅ Fetch User Profile
+    const profileResponse = await axios.get('https://api.linkedin.com/v2/me', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
 
-    if (decodedToken) {
-      console.log("🔹 User Info:", decodedToken);
+    console.log("🔹 User Profile:", profileResponse.data);
 
-      const userData = {
-        email: decodedToken.email,
-        firstName: decodedToken.given_name,
-        lastName: decodedToken.family_name,
-        picture: decodedToken.picture,
-      };
+    // ✅ Fetch Email Address
+    const emailResponse = await axios.get('https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
 
-      res.json({
-        message: "User info retrieved successfully",
-        user: userData,
-        access_token,
-      });
+    console.log("🔹 Email:", emailResponse.data);
 
-    } else {
-      res.status(400).json({ error: "Failed to decode ID token" });
-    }
+    const userData = {
+      firstName: profileResponse.data.localizedFirstName,
+      lastName: profileResponse.data.localizedLastName,
+      profilePicture: profileResponse.data.profilePicture?.['displayImage~']?.elements[0]?.identifiers[0]?.identifier || null,
+      email: emailResponse.data.elements[0]['handle~'].emailAddress,
+    };
+
+    res.json({
+      message: "User info retrieved successfully",
+      user: userData,
+      access_token,
+    });
 
   } catch (error) {
-    console.error("❌ Error exchanging token:", error?.response?.data || error.message);
-    res.status(500).json({ error: 'Failed to get access token' });
+    console.error("❌ Error:", error?.response?.data || error.message);
+    res.status(500).json({ error: 'Failed to get access token or user data' });
   }
 });
 
