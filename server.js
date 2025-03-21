@@ -75,11 +75,9 @@ app.get('/linkedin/callback', async (req, res) => {
         exp: decoded.exp,  // Expiry timestamp
       };
 
-      res.json({
-        message: "User info retrieved successfully",
-        user: userData,
-        access_token,
-      });
+      // ✅ Redirect back to the app with token
+      res.redirect(`myapp://linkedin/callback?token=${access_token}`);
+
     });
 
   } catch (error) {
