@@ -2,8 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const jwksClient = require('jwks-rsa');  // ✅ For LinkedIn public key retrieval
 
 const app = express();
 app.use(cors());
@@ -12,18 +10,6 @@ app.use(express.json());
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI;
-
-// ✅ LinkedIn JWKS client for token verification
-const client = jwksClient({
-  jwksUri: 'https://www.linkedin.com/oauth/openid/jwks',
-});
-
-const getKey = (header, callback) => {
-  client.getSigningKey(header.kid, (err, key) => {
-    const signingKey = key?.getPublicKey();
-    callback(null, signingKey);
-  });
-};
 
 app.get('/linkedin/callback', async (req, res) => {
   console.log("🔹 Callback URL hit");
@@ -55,31 +41,29 @@ app.get('/linkedin/callback', async (req, res) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
 
-    const { id_token, access_token } = tokenResponse.data;
-    console.log("✅ Token Response:", tokenResponse.data);
+    const { access_token } = tokenResponse.data;
+    console.log("✅ Access Token:", access_token);
 
-    // ✅ Verify ID Token using LinkedIn public key
-    jwt.verify(id_token, getKey, { algorithms: ['RS256'] }, (err, decoded) => {
-      if (err) {
-        console.error("❌ Invalid ID token:", err);
-        return res.status(400).json({ error: "Invalid ID token" });
-      }
+    // ✅ Fetch LinkedIn Profile Information
+    const profileResponse = await axios.get('https://api.linkedin.com/v2/me', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
 
-      console.log("🔹 Decoded Token:", decoded);
+    const emailResponse = await axios.get('https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
 
-      const userData = {
-        email: decoded.email,
-        firstName: decoded.given_name,
-        lastName: decoded.family_name,
-        picture: decoded.picture,
-        exp: decoded.exp,  // Expiry timestamp
-      };
+    const userData = {
+      firstName: profileResponse.data.localizedFirstName,
+      lastName: profileResponse.data.localizedLastName,
+      email: emailResponse.data.elements[0]['handle~'].emailAddress,
+      profileImage: profileResponse.data.profilePicture?.['displayImage~']?.elements[0]?.identifiers[0]?.identifier || null,
+    };
 
-      res.json({
-        message: "User info retrieved successfully",
-        user: userData,
-        access_token,
-      });
+    res.json({
+      message: "User info retrieved successfully",
+      user: userData,
+      access_token,
     });
 
   } catch (error) {
