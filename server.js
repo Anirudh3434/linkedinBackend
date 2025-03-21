@@ -76,7 +76,7 @@ app.get('/linkedin/callback', async (req, res) => {
       };
 
       // ✅ Redirect back to the app with token
-      res.redirect(`myapp://linkedin/callback?token=${access_token}`);
+      res.redirect(`https://myapp/linkedin/callback?token=${access_token}`);
 
     });
 
