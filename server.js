@@ -73,6 +73,7 @@ app.get('/linkedin/callback', async (req, res) => {
         lastName: decoded.family_name,
         picture: decoded.picture,
         exp: decoded.exp,  // Expiry timestamp
+        aud: decoded.aud
       };
 
       // ✅ Stringify and encode user data before sending in the URL
