@@ -3,7 +3,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const jwksClient = require('jwks-rsa');  // ✅ For LinkedIn public key retrieval
+const jwksClient = require('jwks-rsa');  
 
 const app = express();
 app.use(cors());
@@ -75,8 +75,11 @@ app.get('/linkedin/callback', async (req, res) => {
         exp: decoded.exp,  // Expiry timestamp
       };
 
-      // ✅ Redirect back to the app with token
-      res.redirect(`myapp://linkedin/callback?token=${userData}`);
+      // ✅ Stringify and encode user data before sending in the URL
+      const encodedUserData = encodeURIComponent(JSON.stringify(userData));
+
+      // ✅ Redirect back to the app with encoded user data
+      res.redirect(`myapp://linkedin/callback?user=${encodedUserData}`);
 
     });
 
