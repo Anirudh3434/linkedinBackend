@@ -3,17 +3,25 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const jwksClient = require('jwks-rsa');  
+const jwksClient = require('jwks-rsa');
+const fs = require('fs');
+const https = require('https');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ✅ SSL Certificates
+const privateKey = fs.readFileSync('./key.pem', 'utf8');
+const certificate = fs.readFileSync('./cert.pem', 'utf8');
+const credentials = { key: privateKey, cert: certificate };
+
+// ✅ LinkedIn OAuth Config
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = 'https://linkedinbackend-ndvv.onrender.com/linkedin/callback';
+const REDIRECT_URI = 'https://localhost:8080/linkedin/callback';  // Change to HTTPS
 
-// ✅ LinkedIn JWKS client for token verification
+// ✅ JWKS client for LinkedIn public key verification
 const client = jwksClient({
   jwksUri: 'https://www.linkedin.com/oauth/openid/jwks',
 });
@@ -43,7 +51,6 @@ app.get('/linkedin/callback', async (req, res) => {
   console.log("✅ Authorization Code Received:", code);
 
   try {
-    // ✅ Exchange Authorization Code for Access Token
     const tokenResponse = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', null, {
       params: {
         grant_type: 'authorization_code',
@@ -58,7 +65,6 @@ app.get('/linkedin/callback', async (req, res) => {
     const { id_token, access_token } = tokenResponse.data;
     console.log("✅ Token Response:", tokenResponse.data);
 
-    // ✅ Verify ID Token using LinkedIn public key
     jwt.verify(id_token, getKey, { algorithms: ['RS256'] }, (err, decoded) => {
       if (err) {
         console.error("❌ Invalid ID token:", err);
@@ -72,16 +78,13 @@ app.get('/linkedin/callback', async (req, res) => {
         firstName: decoded.given_name,
         lastName: decoded.family_name,
         picture: decoded.picture,
-        exp: decoded.exp,  // Expiry timestamp
+        exp: decoded.exp,
         aud: decoded.aud
       };
 
-      // ✅ Stringify and encode user data before sending in the URL
       const encodedUserData = encodeURIComponent(JSON.stringify(userData));
 
-      // ✅ Redirect back to the app with encoded user data
       res.redirect(`myapp://linkedin/callback?user=${encodedUserData}`);
-
     });
 
   } catch (error) {
@@ -90,5 +93,8 @@ app.get('/linkedin/callback', async (req, res) => {
   }
 });
 
+// ✅ Create HTTPS server
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+const httpsServer = https.createServer(credentials, app);
+
+httpsServer.listen(PORT, () => console.log(`🚀 Server running on https://localhost:${PORT}`));
