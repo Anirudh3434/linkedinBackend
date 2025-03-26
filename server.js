@@ -19,7 +19,7 @@ const credentials = { key: privateKey, cert: certificate };
 // ✅ LinkedIn OAuth Config
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = 'https://localhost:8080/linkedin/callback';  // Change to HTTPS
+const REDIRECT_URI = 'https://linkedinbackend-ndvv.onrender.com/linkedin/callback';  // Change to HTTPS
 
 // ✅ JWKS client for LinkedIn public key verification
 const client = jwksClient({
