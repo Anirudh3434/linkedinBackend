@@ -11,7 +11,7 @@ app.use(express.json());
 // ✅ LinkedIn OAuth Config
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = 'http://localhost:8080/linkedin/callback'; // Update if deployed
+const REDIRECT_URI = 'https://linkedinbackend-ndvv.onrender.com/linkedin/callback'; // Update if deployed
 
 // ✅ Configure your app's custom URL scheme here
 const IOS_APP_SCHEME = 'myapp'; // Change this to your app's registered URL scheme
