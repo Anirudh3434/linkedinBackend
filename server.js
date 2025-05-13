@@ -19,7 +19,7 @@ const credentials = { key: privateKey, cert: certificate };
 // ✅ LinkedIn OAuth Config
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = 'https://linkedinbackend-ndvv.onrender.com/linkedin/callback';  // Change to HTTPS
+const REDIRECT_URI = 'https://linkedinbackend-ndvv.onrender.com/linkedin/callback';
 
 // ✅ JWKS client for LinkedIn public key verification
 const client = jwksClient({
@@ -84,22 +84,26 @@ app.get('/linkedin/callback', async (req, res) => {
 
       const encodedUserData = encodeURIComponent(JSON.stringify(userData));
 
-     res.send(`
-  <!DOCTYPE html>
-  <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>LinkedIn Login Success</title>
-  </head>
-  <body>
-    <h2>Login Successful 🎉</h2>
-    <p>Click the link below to go back to the app:</p>
-    <a href="myapp://linkedin/callback?user=${encodedUserData}">
-      Open App
-    </a>
-  </body>
-  </html>
-`);
+      // ✅ Send HTML page with auto redirect and fallback link
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Redirecting...</title>
+          <script>
+            setTimeout(function() {
+              window.location.href = "myapp://linkedin/callback?user=${encodedUserData}";
+            }, 3000);
+          </script>
+        </head>
+        <body>
+          <h2>Login successful! Redirecting to the app...</h2>
+          <p>If you are not redirected automatically, <a href="myapp://linkedin/callback?user=${encodedUserData}">click here</a>.</p>
+        </body>
+        </html>
+      `);
+    });
 
   } catch (error) {
     console.error("❌ Error:", error?.response?.data || error.message);
