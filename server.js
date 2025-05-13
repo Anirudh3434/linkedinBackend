@@ -4,22 +4,15 @@ const axios = require('axios');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const jwksClient = require('jwks-rsa');
-const fs = require('fs');
-const https = require('https');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ SSL Certificates
-const privateKey = fs.readFileSync('./key.pem', 'utf8');
-const certificate = fs.readFileSync('./cert.pem', 'utf8');
-const credentials = { key: privateKey, cert: certificate };
-
 // ✅ LinkedIn OAuth Config
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = 'https://linkedinbackend-ndvv.onrender.com/linkedin/callback';
+const REDIRECT_URI = 'http://localhost:8080/linkedin/callback'; // Update if deployed
 
 // ✅ JWKS client for LinkedIn public key verification
 const client = jwksClient({
@@ -84,7 +77,7 @@ app.get('/linkedin/callback', async (req, res) => {
 
       const encodedUserData = encodeURIComponent(JSON.stringify(userData));
 
-      // ✅ Send HTML page with auto redirect and fallback link
+      // ✅ Send HTML with fallback and auto-redirect
       res.send(`
         <!DOCTYPE html>
         <html lang="en">
@@ -111,8 +104,6 @@ app.get('/linkedin/callback', async (req, res) => {
   }
 });
 
-// ✅ Create HTTPS server
+// ✅ Start HTTP server
 const PORT = process.env.PORT || 8080;
-const httpsServer = https.createServer(credentials, app);
-
-httpsServer.listen(PORT, () => console.log(`🚀 Server running on https://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
