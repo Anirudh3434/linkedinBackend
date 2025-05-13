@@ -84,8 +84,22 @@ app.get('/linkedin/callback', async (req, res) => {
 
       const encodedUserData = encodeURIComponent(JSON.stringify(userData));
 
-      res.redirect(`myapp://linkedin/callback?user=${encodedUserData}`);
-    });
+     res.send(`
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>LinkedIn Login Success</title>
+  </head>
+  <body>
+    <h2>Login Successful 🎉</h2>
+    <p>Click the link below to go back to the app:</p>
+    <a href="myapp://linkedin/callback?user=${encodedUserData}">
+      Open App
+    </a>
+  </body>
+  </html>
+`);
 
   } catch (error) {
     console.error("❌ Error:", error?.response?.data || error.message);
