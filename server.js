@@ -1,89 +1,91 @@
-require('dotenv').config();
-const express = require('express');
-const axios = require('axios');
-const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const jwksClient = require('jwks-rsa');
-const app = express();
-app.use(cors());
-app.use(express.json());
+require("dotenv").config()
+const express = require("express")
+const axios = require("axios")
+const cors = require("cors")
+const jwt = require("jsonwebtoken")
+const jwksClient = require("jwks-rsa")
+const app = express()
+app.use(cors())
+app.use(express.json())
 
-// ✅ LinkedIn OAuth Config
-const CLIENT_ID = process.env.CLIENT_ID;
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = 'https://linkedinbackend-ndvv.onrender.com/linkedin/callback'; // Update if deployed
+// LinkedIn OAuth Config
+const CLIENT_ID = process.env.CLIENT_ID
+const CLIENT_SECRET = process.env.CLIENT_SECRET
+const REDIRECT_URI = "https://linkedinbackend-ndvv.onrender.com/linkedin/callback"
 
-// ✅ Configure your app's custom URL scheme here
-const IOS_APP_SCHEME = 'myapp'; // Change this to your app's registered URL scheme
+// Configure your app's custom URL scheme here
+const APP_SCHEME = "myapp"
 
-// ✅ JWKS client for LinkedIn public key verification
+// JWKS client for LinkedIn public key verification
 const client = jwksClient({
-  jwksUri: 'https://www.linkedin.com/oauth/openid/jwks',
-});
+  jwksUri: "https://www.linkedin.com/oauth/openid/jwks",
+})
 
 const getKey = (header, callback) => {
   client.getSigningKey(header.kid, (err, key) => {
-    const signingKey = key?.getPublicKey();
-    callback(null, signingKey);
-  });
-};
+    const signingKey = key?.getPublicKey()
+    callback(null, signingKey)
+  })
+}
 
-app.get('/linkedin/callback', async (req, res) => {
-  console.log("🔹 Callback URL hit");
-  const { code, error, error_description } = req.query;
-  
+app.get("/linkedin/callback", async (req, res) => {
+  console.log("🔹 Callback URL hit")
+  const { code, error, error_description } = req.query
+
   if (error) {
-    console.error("❌ LinkedIn Error:", error, error_description);
-    return res.status(400).json({ error, error_description });
+    console.error("❌ LinkedIn Error:", error, error_description)
+    return res.status(400).json({ error, error_description })
   }
-  
+
   if (!code) {
-    console.error("❌ Authorization code missing");
-    return res.status(400).json({ error: "Authorization code missing" });
+    console.error("❌ Authorization code missing")
+    return res.status(400).json({ error: "Authorization code missing" })
   }
-  
-  console.log("✅ Authorization Code Received:", code);
-  
+
+  console.log("✅ Authorization Code Received:", code)
+
   try {
-    const tokenResponse = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', null, {
+    const tokenResponse = await axios.post("https://www.linkedin.com/oauth/v2/accessToken", null, {
       params: {
-        grant_type: 'authorization_code',
+        grant_type: "authorization_code",
         code,
         redirect_uri: REDIRECT_URI,
         client_id: CLIENT_ID,
         client_secret: CLIENT_SECRET,
       },
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-    
-    const { id_token, access_token } = tokenResponse.data;
-    console.log("✅ Token Response:", tokenResponse.data);
-    
-    jwt.verify(id_token, getKey, { algorithms: ['RS256'] }, (err, decoded) => {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    })
+
+    const { id_token, access_token } = tokenResponse.data
+    console.log("✅ Token Response:", tokenResponse.data)
+
+    jwt.verify(id_token, getKey, { algorithms: ["RS256"] }, (err, decoded) => {
       if (err) {
-        console.error("❌ Invalid ID token:", err);
-        return res.status(400).json({ error: "Invalid ID token" });
+        console.error("❌ Invalid ID token:", err)
+        return res.status(400).json({ error: "Invalid ID token" })
       }
-      
-      console.log("🔹 Decoded Token:", decoded);
-      
+
+      console.log("🔹 Decoded Token:", decoded)
+
       const userData = {
         email: decoded.email,
         firstName: decoded.given_name,
         lastName: decoded.family_name,
         picture: decoded.picture,
         exp: decoded.exp,
-        aud: decoded.aud
-      };
-      
-      const encodedUserData = encodeURIComponent(JSON.stringify(userData));
-      
-      // ✅ Detect device type from User-Agent header
-      const userAgent = req.headers['user-agent'] || '';
-      const isIOS = /iphone|ipad|ipod/i.test(userAgent);
-      
+        aud: decoded.aud,
+        accessToken: access_token, // Include access token for API calls
+      }
+
+      const encodedUserData = encodeURIComponent(JSON.stringify(userData))
+      const deepLinkUrl = `${APP_SCHEME}://linkedin/callback?user=${encodedUserData}`
+
+      // Detect device type from User-Agent header
+      const userAgent = req.headers["user-agent"] || ""
+      const isIOS = /iphone|ipad|ipod/i.test(userAgent)
+
       if (isIOS) {
-        // ✅ iOS-specific handling with Universal Links and fallback
+        // iOS-specific handling with Universal Links and fallback
         res.send(`
           <!DOCTYPE html>
           <html lang="en">
@@ -97,17 +99,26 @@ app.get('/linkedin/callback', async (req, res) => {
                         text-decoration: none; display: inline-block; margin-top: 20px; font-weight: bold; }
             </style>
             <script>
-              // Store data for manual return
-              localStorage.setItem('linkedInUserData', '${encodedUserData}');
-              
-              // Try deep link first
+              // Try multiple approaches for iOS
               function openApp() {
-                window.location.href = "${IOS_APP_SCHEME}://linkedin/callback?user=${encodedUserData}";
+                // Store data in localStorage as fallback
+                localStorage.setItem('linkedInUserData', '${encodedUserData}');
                 
-                // Set a timeout to detect if app didn't open
+                // Try location.href first
+                window.location.href = "${deepLinkUrl}";
+                
+                // Fallback to iframe approach after a delay
                 setTimeout(function() {
-                  document.getElementById('manual-return').style.display = 'block';
-                }, 2000);
+                  var iframe = document.createElement('iframe');
+                  iframe.style.display = 'none';
+                  iframe.src = "${deepLinkUrl}";
+                  document.body.appendChild(iframe);
+                  
+                  // Show manual button after another delay
+                  setTimeout(function() {
+                    document.getElementById('manual-return').style.display = 'block';
+                  }, 1500);
+                }, 500);
               }
               
               // Try opening app when page loads
@@ -120,7 +131,7 @@ app.get('/linkedin/callback', async (req, res) => {
             
             <div id="manual-return" style="display:none">
               <p>If you're not automatically returned to the app, please tap the button below:</p>
-              <a href="${IOS_APP_SCHEME}://linkedin/callback?user=${encodedUserData}" class="button">Return to App</a>
+              <a href="${deepLinkUrl}" class="button">Return to App</a>
               
               <div style="margin-top: 30px;">
                 <p>If the button doesn't work, please open the app manually.</p>
@@ -129,9 +140,9 @@ app.get('/linkedin/callback', async (req, res) => {
             </div>
           </body>
           </html>
-        `);
+        `)
       } else {
-        // ✅ Non-iOS devices (Android/Web)
+        // Non-iOS devices (Android/Web)
         res.send(`
           <!DOCTYPE html>
           <html lang="en">
@@ -140,7 +151,7 @@ app.get('/linkedin/callback', async (req, res) => {
             <title>Redirecting...</title>
             <script>
               // Try deep link
-              window.location.href = "${IOS_APP_SCHEME}://linkedin/callback?user=${encodedUserData}";
+              window.location.href = "${deepLinkUrl}";
               
               // Fallback after delay
               setTimeout(function() {
@@ -156,24 +167,24 @@ app.get('/linkedin/callback', async (req, res) => {
           <body>
             <h2>Login successful! Redirecting to the app...</h2>
             <div id="manual-return" style="display:none">
-              <p>If you are not redirected automatically, <a href="${IOS_APP_SCHEME}://linkedin/callback?user=${encodedUserData}" class="button">click here</a>.</p>
+              <p>If you are not redirected automatically, <a href="${deepLinkUrl}" class="button">click here</a>.</p>
             </div>
           </body>
           </html>
-        `);
+        `)
       }
-    });
+    })
   } catch (error) {
-    console.error("❌ Error:", error?.response?.data || error.message);
-    res.status(500).json({ error: 'Failed to get access token or user data' });
+    console.error("❌ Error:", error?.response?.data || error.message)
+    res.status(500).json({ error: "Failed to get access token or user data" })
   }
-});
+})
 
-// ✅ API endpoint to check auth status and retrieve stored user data
-app.get('/api/linkedin/authcheck', (req, res) => {
-  res.json({ message: 'Use this endpoint in your app to retrieve auth status' });
-});
+// API endpoint to check auth status and retrieve stored user data
+app.get("/api/linkedin/authcheck", (req, res) => {
+  res.json({ message: "Use this endpoint in your app to retrieve auth status" })
+})
 
-// ✅ Start HTTP server
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+// Start HTTP server
+const PORT = process.env.PORT || 8080
+app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`))
